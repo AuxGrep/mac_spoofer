@@ -1,109 +1,98 @@
 import subprocess
-import os
+import logging
 import sys
 import time
+import os
+import platform
 from colorama import Fore, Style
+import argparse
 
-'''
+logs = logging.basicConfig(level=logging.DEBUG, filemode='a', filename='mac_spoof.log', format='[%(asctime)s] - %(levelname)s %(message)s')
 
-THIS ONLY FOR EDUCUTIONAL PURPOSES
-        CODED BY: AuxGrep
+version = 2.0
 
-'''
-version = 1.0
-
-def args_check():
-    if len(sys.argv) < 3:
-        sys.exit('USAGE: sudo python3 mac_spoof.py <External_card_interface> <client_mac_address>')
+def args_parse():
+    parser = argparse.ArgumentParser(description='Spoof MAC address on a network interface')
+    parser.add_argument('-i', '--interface', help='Network interface to spoof MAC address on', required=True)
+    parser.add_argument('-m', '--mac', help='MAC Spoofer Program', required=True)
+    return parser.parse_args()
 
 def checkroot():
     if not 'SUDO_UID' in os.environ.keys():
         sys.exit(f'{Fore.RED}Run the script with root{Style.RESET_ALL}')
 
-class Mac_spoof():
+def interface_check(interface):
     try:
-        @staticmethod
-        def mac_changer(interface, macADDR):
-            non_monitor = os.listdir('/sys/class/net')
-            for hacker, network_card in enumerate(non_monitor, start=1):
-                print(f'{hacker}.{network_card}')
-            print('')
-            while True:
-                try:
-                    card = int(input(f'[>>>] Enter the external network_card interface number 1 to {len(os.listdir("/sys/class/net"))}: '))
-                    if card > len(os.listdir('/sys/class/net')) or card == 0:
-                        print(f'[xxx] Invalid option!! choose from 1 - {0}'.format(len(os.listdir("/sys/class/net"))))
-                        continue
-                    else:
-                        capture_card = non_monitor[card - 1]
-                        with open('card.txt', mode='w') as card_adapter:
-                            bk = card_adapter.write(str(capture_card))
-                        break
-                except KeyboardInterrupt:
-                    os.system('clear')
-                    sys.exit('Cancelled byeeeee!!!!')
+        if interface in os.listdir('/sys/class/net'):
+            return interface
+        else:
+            logging.error(f'This interface:{interface} is Invalid')
+            sys.exit(f'\nInvalid Interface: {interface}')
 
-            with open('card.txt', mode='r') as f:
-                card_pull = f.read()
-            os.system('clear')
-            print('[>>>] Deactivating the Network...')
-            time.sleep(2)
-            subprocess.run(['systemctl', 'stop', 'wpa_supplicant.service'], stderr=subprocess.DEVNULL, \
-                        stdout=subprocess.DEVNULL)
-            
-            print('[>>>] kill Network service')
-            time.sleep(2)
-            subprocess.run(['airmon-ng', 'check', 'kill'], stderr=subprocess.DEVNULL, \
-                        stdout=subprocess.DEVNULL)
-            print('[>>>] Enabling the WPA supplicant service')
-            time.sleep(1)
-            subprocess.run(['systemctl', 'start', 'wpa_supplicant.service'], stderr=subprocess.DEVNULL, \
-                        stdout=subprocess.DEVNULL)
-            
-            print('[>>>] Disabling the {0}'.format(interface))
-            time.sleep(2)
-            os.system(f'ip link set {card_pull} down')
-            print(f'[>>>] Changing the MAc Address to {macADDR}')
-            subprocess.run(['macchanger', card_pull, '-b', '-m', macADDR], stderr=subprocess.DEVNULL, \
-                        stdout=subprocess.DEVNULL)
-            
-            print('[>>>] Enabling the interface: {0} up'.format(card_pull))
-            time.sleep(2)
-            print('[>>>] Starting a Network Manager Service')
-            subprocess.run(['systemctl', 'start', 'NetworkManager.service'], stderr=subprocess.DEVNULL, \
-                        stdout=subprocess.DEVNULL)
-            print('[>>>] DONE')
-            return interface, macADDR, card_pull
+    except Exception as e:
+        exit(logging.error(e))
 
-        @staticmethod
-        def check_adapter(interface):
-            print('[>>>] Checking the Network card capabilities')
-            time.sleep(2)
-            try:
-                if interface in os.listdir('/sys/class/net'):
-                    interface_out = subprocess.check_output(['iwconfig', interface]).decode('utf-8')
-                    return 'Mode:Monitor' in interface_out
-                else:
-                    pass
-            except subprocess.CalledProcessError:
-                return False
-    except KeyboardInterrupt:
-        os.system('clear')
-        sys.exit('Keyboard Interrupted!! Byeeee!!')
+def os_check(support=['Linux', 'Unix']):
+    if platform.system() not in support:
+        logging.error('Unsupported OS detected')
+        exit('This program runs on Linux only')
+
+def mac(interface, bssid):
+    try:
+        logging.info(f'Disabling the WPA service on {interface}')
+        print('[Console] ===> Disabling WPA service')
+        subprocess.run(['systemctl', 'stop', 'wpa_supplicant.service'], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+        time.sleep(2)
+
+        logging.info(f'Killing the Network and Libs for WPA service')
+        print('[Console] ===> Killing the Network and Libs for WPA service')
+        subprocess.run(['airmon-ng', 'check', 'kill'], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+        time.sleep(2)
+
+        logging.info(f'Starting the Network and Libs for WPA service')
+        print('[Console] ===> Starting the Network and Libs for WPA service')
+        subprocess.run(['systemctl', 'start', 'wpa_supplicant.service'], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+        time.sleep(2)
+
+        logging.warning(f'Bringing the Interface Down')
+        print('[Console] ===> Bringing the Interface Down')
+        os.system(f'ip link set {interface} down')
+        time.sleep(2)
+
+        logging.info(f'Changing the MAC Address on Interface {interface} to {bssid}')
+        print(f'[Console] ===> Changing the MAC Address on Interface {interface} to {bssid}')
+        subprocess.run(['macchanger', interface, '-b', '-m', bssid], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+        time.sleep(2)
+
+        print(f'[Console] ===> Enabling the interface: {interface} up')
+        logging.info(f'Enabling the interface: {interface} up')
+        os.system(f'ip link set {interface} up')
+
+        print('[Console] ===> Starting a Network Manager Service')
+        logging.info('Starting a Network Manager Service')
+        subprocess.run(['systemctl', 'start', 'NetworkManager.service'], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+        time.sleep(3)
+
+        print('[Console] ===> Done')
+    except OSError as e:
+        logging.error(e)
+
+def print_banner():
+    banner = r"""
+{0}__  __    _    ____   ____  ____   ___   ___  _____ _____ ____  
+|  \/  |  / \  / ___| / ___||  _ \ / _ \ / _ \|  ___| ____|  _ \ 
+| |\/| | / _ \| |     \___ \| |_) | | | | | | | |_  |  _| | |_) |
+| |  | |/ ___ \ |___   ___) |  __/| |_| | |_| |  _| | |___|  _ <  COder: AuxGrep
+|_|  |_/_/   \_\____| |____/|_|    \___/ \___/|_|   |_____|_| \_\
+                                                                 {1}""".format(Fore.CYAN, Style.RESET_ALL)
+    print(banner)
 
 if __name__ == "__main__":
-    args_check()
+    print_banner()
+    print('Program Started .....')
+    time.sleep(3)
+    args = args_parse()
     checkroot()
-    interface_name = str(sys.argv[1])
-    if Mac_spoof.check_adapter(interface_name):
-        print(f'[>>>] Network Adapter Monitor Mode check ...{Fore.GREEN}0k{Style.RESET_ALL}')
-        time.sleep(2)
-        print(f'[>>>] starting Mac spoofing....{Fore.GREEN}0k{Style.RESET_ALL}')
-        time.sleep(2)
-        subprocess.run(['airmon-ng', 'stop', interface_name], stderr=subprocess.DEVNULL, \
-                       stdout=subprocess.DEVNULL)
-        Mac_spoof.mac_changer(interface_name, f"{sys.argv[2]}")
-
-    else:
-        print(f'[>>>] Network Adapter Not in Monitor Mode{Fore.MAGENTA} Activating the Network card Now{Style.RESET_ALL}')
-        Mac_spoof.mac_changer(interface_name, f"{sys.argv[2]}")
+    interface_check(interface=args.interface)
+    os_check()
+    mac(interface=args.interface, bssid=args.mac)
